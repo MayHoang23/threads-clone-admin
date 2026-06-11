@@ -7,6 +7,7 @@ const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: "📊" },
   { href: "/users", label: "Người dùng", icon: "👥" },
   { href: "/posts", label: "Bài viết", icon: "📝" },
+  { href: "/hashtags", label: "Hashtag", icon: "🏷️" },
   { href: "/reports", label: "Báo cáo", icon: "🚨" },
 ];
 
