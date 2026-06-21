@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState, useCallback } from "react";
 import { fetchAPI } from "@/lib/api";
+import useDebounce from "@/lib/useDebounce";
 
 const formatDate = (d) => new Date(d).toLocaleDateString("vi-VN");
 const truncate = (s, n) => (s && s.length > n ? s.slice(0, n) + "…" : s);
@@ -8,8 +9,10 @@ const truncate = (s, n) => (s && s.length > n ? s.slice(0, n) + "…" : s);
 export default function PostsPage() {
   const [posts, setPosts] = useState([]);
   const [total, setTotal] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
+  const debouncedSearch = useDebounce(search, 400);
   const [hidden, setHidden] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
@@ -21,18 +24,23 @@ export default function PostsPage() {
     setLoading(true);
     setError(false);
     try {
-      const qs = new URLSearchParams({ page, limit: 10, search, hidden }).toString();
+      const qs = new URLSearchParams({ page, limit: 10, search: debouncedSearch, hidden }).toString();
       const data = await fetchAPI(`/admin/posts?${qs}`);
-      if (data?.success) { setPosts(data.data.posts); setTotal(data.data.total); }
+      if (data?.success) { setPosts(data.data.posts); setTotal(data.data.total); setTotalPages(data.data.totalPages); }
       else setError(true);
     } catch (err) {
       setError(true);
     } finally {
       setLoading(false);
     }
-  }, [page, search, hidden]);
+  }, [page, debouncedSearch, hidden]);
 
   useEffect(() => { fetchPosts(); }, [fetchPosts]);
+
+  // Khi totalPages co lại (vd xóa hết item ở trang cuối) mà page vẫn trỏ quá → lùi về trang cuối hợp lệ
+  useEffect(() => {
+    if (page > totalPages && totalPages > 0) setPage(totalPages);
+  }, [totalPages, page]);
 
   const handleDelete = async (postId) => {
     if (!confirm("Xóa bài viết này?")) return;
@@ -47,8 +55,6 @@ export default function PostsPage() {
     if (data?.success) { showToast("Đã khôi phục bài viết"); fetchPosts(); }
     else showToast(data?.message || "Lỗi");
   };
-
-  const totalPages = Math.ceil(total / 10);
 
   return (
     <div>

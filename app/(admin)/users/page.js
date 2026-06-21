@@ -1,12 +1,15 @@
 "use client";
 import { useEffect, useState, useCallback } from "react";
 import { fetchAPI } from "@/lib/api";
+import useDebounce from "@/lib/useDebounce";
 
 export default function UsersPage() {
   const [users, setUsers] = useState([]);
   const [total, setTotal] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
+  const debouncedSearch = useDebounce(search, 400);
   const [role, setRole] = useState("");
   const [banned, setBanned] = useState("");
   const [loading, setLoading] = useState(true);
@@ -19,18 +22,23 @@ export default function UsersPage() {
     setLoading(true);
     setError(false);
     try {
-      const qs = new URLSearchParams({ page, limit: 10, search, role, banned }).toString();
+      const qs = new URLSearchParams({ page, limit: 10, search: debouncedSearch, role, banned }).toString();
       const data = await fetchAPI(`/admin/users?${qs}`);
-      if (data?.success) { setUsers(data.data.users); setTotal(data.data.total); }
+      if (data?.success) { setUsers(data.data.users); setTotal(data.data.total); setTotalPages(data.data.totalPages); }
       else setError(true);
     } catch (err) {
       setError(true);
     } finally {
       setLoading(false);
     }
-  }, [page, search, role, banned]);
+  }, [page, debouncedSearch, role, banned]);
 
   useEffect(() => { fetchUsers(); }, [fetchUsers]);
+
+  // Khi totalPages co lại (vd xóa hết item ở trang cuối) mà page vẫn trỏ quá → lùi về trang cuối hợp lệ
+  useEffect(() => {
+    if (page > totalPages && totalPages > 0) setPage(totalPages);
+  }, [totalPages, page]);
 
   const handleBan = async (userId) => {
     const data = await fetchAPI(`/admin/users/${userId}/ban`, { method: "PATCH" });
@@ -57,8 +65,6 @@ export default function UsersPage() {
     if (data?.success) { showToast("Đã xóa user"); fetchUsers(); }
     else showToast(data?.message || "Lỗi");
   };
-
-  const totalPages = Math.ceil(total / 10);
 
   return (
     <div>

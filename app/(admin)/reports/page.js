@@ -13,6 +13,7 @@ const statusStyle = {
 export default function ReportsPage() {
   const [reports, setReports] = useState([]);
   const [total, setTotal] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
   const [page, setPage] = useState(1);
   const [status, setStatus] = useState("");
   const [loading, setLoading] = useState(true);
@@ -28,7 +29,7 @@ export default function ReportsPage() {
     try {
       const qs = new URLSearchParams({ page, limit: 10, status }).toString();
       const data = await fetchAPI(`/admin/reports?${qs}`);
-      if (data?.success) { setReports(data.data.reports); setTotal(data.data.total); }
+      if (data?.success) { setReports(data.data.reports); setTotal(data.data.total); setTotalPages(data.data.totalPages); }
       else setError(true);
     } catch (err) {
       setError(true);
@@ -38,6 +39,11 @@ export default function ReportsPage() {
   }, [page, status]);
 
   useEffect(() => { fetchReports(); }, [fetchReports]);
+
+  // Khi totalPages co lại (vd xử lý hết report ở trang cuối) mà page vẫn trỏ quá → lùi về trang cuối hợp lệ
+  useEffect(() => {
+    if (page > totalPages && totalPages > 0) setPage(totalPages);
+  }, [totalPages, page]);
 
   const handleResolve = async (action) => {
     const data = await fetchAPI(`/admin/reports/${resolveModal.id}/resolve`, {
@@ -50,8 +56,6 @@ export default function ReportsPage() {
       fetchReports();
     } else showToast(data?.message || "Lỗi");
   };
-
-  const totalPages = Math.ceil(total / 10);
 
   return (
     <div>
@@ -181,6 +185,51 @@ export default function ReportsPage() {
                     {new Date(resolveModal.createdAt).toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}
                   </span>
                 </div>
+              </div>
+
+              {/* Bài viết bị báo cáo — giúp admin xem nội dung trước khi quyết định */}
+              <div className="space-y-1.5">
+                <span className="text-xs font-medium text-gray-500">Bài viết bị báo cáo</span>
+                {resolveModal.post ? (
+                  <div className="border border-gray-200 dark:border-gray-700 rounded-xl p-4 space-y-2">
+                    <div className="flex items-center gap-2">
+                      <div className="w-6 h-6 rounded-full bg-gray-200 dark:bg-gray-700 overflow-hidden flex-shrink-0">
+                        {resolveModal.post.author?.avatar && (
+                          <img src={resolveModal.post.author.avatar} alt="" className="w-full h-full object-cover" />
+                        )}
+                      </div>
+                      <span className="text-xs font-medium text-gray-900 dark:text-white">
+                        @{resolveModal.post.author?.username}
+                      </span>
+                      <span className="text-[10px] text-gray-400 ml-auto">
+                        {new Date(resolveModal.post.createdAt).toLocaleDateString("vi-VN")}
+                      </span>
+                    </div>
+                    {resolveModal.post.content && (
+                      <p className="text-xs text-gray-700 dark:text-gray-300 whitespace-pre-wrap break-words max-h-32 overflow-y-auto">
+                        {resolveModal.post.content}
+                      </p>
+                    )}
+                    {resolveModal.post.media?.length > 0 && (
+                      <div className="flex gap-2 flex-wrap pt-1">
+                        {resolveModal.post.media.map((m, idx) => (
+                          m.type === "VIDEO" ? (
+                            <video key={idx} src={m.url} className="w-16 h-16 rounded-lg object-cover bg-black" muted />
+                          ) : (
+                            <img key={idx} src={m.url} alt="" className="w-16 h-16 rounded-lg object-cover" />
+                          )
+                        ))}
+                      </div>
+                    )}
+                    {!resolveModal.post.content && !(resolveModal.post.media?.length) && (
+                      <p className="text-xs text-gray-400 italic">(Bài viết không có nội dung văn bản)</p>
+                    )}
+                  </div>
+                ) : (
+                  <div className="text-xs text-gray-400 text-center border border-dashed border-gray-200 dark:border-gray-700 rounded-xl py-3">
+                    Báo cáo này không gắn với bài viết cụ thể
+                  </div>
+                )}
               </div>
 
               <p className="text-xs text-gray-500 text-center pt-1">Chọn hành động bên dưới để xử lý báo cáo này</p>

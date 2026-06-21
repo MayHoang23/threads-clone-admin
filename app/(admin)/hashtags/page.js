@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState, useCallback } from "react";
 import { fetchAPI } from "@/lib/api";
+import useDebounce from "@/lib/useDebounce";
 
 const countBadge = (n) => {
   if (n > 10) return "bg-green-50 text-green-600 dark:bg-green-900/20 dark:text-green-400";
@@ -11,8 +12,10 @@ const countBadge = (n) => {
 export default function HashtagsPage() {
   const [hashtags, setHashtags] = useState([]);
   const [total, setTotal] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
+  const debouncedSearch = useDebounce(search, 400);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [toast, setToast] = useState("");
@@ -24,16 +27,16 @@ export default function HashtagsPage() {
     setLoading(true);
     setError(false);
     try {
-      const qs = new URLSearchParams({ page, limit: 20, search }).toString();
+      const qs = new URLSearchParams({ page, limit: 20, search: debouncedSearch }).toString();
       const data = await fetchAPI(`/admin/hashtags?${qs}`);
-      if (data?.success) { setHashtags(data.data.hashtags); setTotal(data.data.total); }
+      if (data?.success) { setHashtags(data.data.hashtags); setTotal(data.data.total); setTotalPages(data.data.totalPages); }
       else setError(true);
     } catch (err) {
       setError(true);
     } finally {
       setLoading(false);
     }
-  }, [page, search]);
+  }, [page, debouncedSearch]);
 
   const fetchTop = useCallback(async () => {
     try {
@@ -47,14 +50,17 @@ export default function HashtagsPage() {
   useEffect(() => { fetchHashtags(); }, [fetchHashtags]);
   useEffect(() => { fetchTop(); }, [fetchTop]);
 
+  // Khi totalPages co lại (vd xóa hết item ở trang cuối) mà page vẫn trỏ quá → lùi về trang cuối hợp lệ
+  useEffect(() => {
+    if (page > totalPages && totalPages > 0) setPage(totalPages);
+  }, [totalPages, page]);
+
   const handleDelete = async (id, name) => {
     if (!confirm(`Xóa hashtag #${name}?`)) return;
     const data = await fetchAPI(`/admin/hashtags/${id}`, { method: "DELETE" });
     if (data?.success) { showToast(data.message || "Đã xóa hashtag"); fetchHashtags(); fetchTop(); }
     else showToast(data?.message || "Lỗi");
   };
-
-  const totalPages = Math.ceil(total / 20);
 
   return (
     <div>
