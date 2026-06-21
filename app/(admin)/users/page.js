@@ -10,31 +10,45 @@ export default function UsersPage() {
   const [role, setRole] = useState("");
   const [banned, setBanned] = useState("");
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
   const [toast, setToast] = useState("");
 
   const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(""), 3000); };
 
   const fetchUsers = useCallback(async () => {
     setLoading(true);
-    const qs = new URLSearchParams({ page, limit: 10, search, role, banned }).toString();
-    const data = await fetchAPI(`/admin/users?${qs}`);
-    if (data?.success) { setUsers(data.data.users); setTotal(data.data.total); }
-    setLoading(false);
+    setError(false);
+    try {
+      const qs = new URLSearchParams({ page, limit: 10, search, role, banned }).toString();
+      const data = await fetchAPI(`/admin/users?${qs}`);
+      if (data?.success) { setUsers(data.data.users); setTotal(data.data.total); }
+      else setError(true);
+    } catch (err) {
+      setError(true);
+    } finally {
+      setLoading(false);
+    }
   }, [page, search, role, banned]);
 
   useEffect(() => { fetchUsers(); }, [fetchUsers]);
 
-  const handleBan = async (userId, isBanned) => {
+  const handleBan = async (userId) => {
     const data = await fetchAPI(`/admin/users/${userId}/ban`, { method: "PATCH" });
     if (data?.success) { showToast(data.message); fetchUsers(); }
+    else showToast(data?.message || "Có lỗi xảy ra");
   };
 
-  const handleRole = async (userId, newRole) => {
+  const handleRole = async (userId, newRole, username) => {
+    const msg = newRole === "ADMIN"
+      ? `Xác nhận cấp quyền ADMIN cho @${username}? Người này sẽ có toàn quyền quản trị.`
+      : `Xác nhận đổi quyền @${username} thành ${newRole}?`;
+    if (!window.confirm(msg)) return;
     const data = await fetchAPI(`/admin/users/${userId}/role`, {
       method: "PATCH",
       body: JSON.stringify({ role: newRole }),
     });
     if (data?.success) { showToast("Đã cập nhật role"); fetchUsers(); }
+    else showToast(data?.message || "Có lỗi xảy ra");
   };
 
   const handleDelete = async (userId) => {
@@ -84,6 +98,14 @@ export default function UsersPage() {
           <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
             {loading ? (
               <tr><td colSpan={6} className="text-center py-8 text-gray-400">Đang tải...</td></tr>
+            ) : error ? (
+              <tr><td colSpan={6} className="text-center py-12">
+                <p className="text-gray-400 mb-3">Không tải được dữ liệu</p>
+                <button onClick={fetchUsers}
+                  className="text-sm px-4 py-2 rounded-lg border border-gray-200 dark:border-gray-700 font-medium hover:bg-gray-50 dark:hover:bg-gray-800">
+                  Thử lại
+                </button>
+              </td></tr>
             ) : users.length === 0 ? (
               <tr><td colSpan={6} className="text-center py-8 text-gray-400">Không có dữ liệu</td></tr>
             ) : users.map(user => (
@@ -101,7 +123,7 @@ export default function UsersPage() {
                 </td>
                 <td className="px-4 py-3 text-gray-500">{user.email}</td>
                 <td className="px-4 py-3">
-                  <select value={user.role} onChange={e => handleRole(user.id, e.target.value)}
+                  <select value={user.role} onChange={e => handleRole(user.id, e.target.value, user.username)}
                     className="text-xs px-2 py-1 rounded-lg border border-gray-200 dark:border-gray-700 bg-transparent outline-none">
                     <option value="USER">USER</option>
                     <option value="ADMIN">ADMIN</option>
@@ -115,7 +137,7 @@ export default function UsersPage() {
                 <td className="px-4 py-3 text-gray-500">{user._count?.posts ?? 0}</td>
                 <td className="px-4 py-3">
                   <div className="flex gap-2">
-                    <button onClick={() => handleBan(user.id, user.isBanned)}
+                    <button onClick={() => handleBan(user.id)}
                       className={`text-xs px-3 py-1.5 rounded-lg font-medium transition ${user.isBanned ? "bg-green-50 text-green-600 hover:bg-green-100 dark:bg-green-900/20 dark:text-green-400" : "bg-orange-50 text-orange-600 hover:bg-orange-100 dark:bg-orange-900/20 dark:text-orange-400"}`}>
                       {user.isBanned ? "Unban" : "Ban"}
                     </button>

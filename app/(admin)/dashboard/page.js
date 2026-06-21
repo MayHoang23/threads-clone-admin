@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { fetchAPI } from "@/lib/api";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid,
@@ -20,14 +20,33 @@ const StatCard = ({ label, value, icon, color }) => (
 export default function DashboardPage() {
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
 
-  useEffect(() => {
-    fetchAPI("/admin/stats").then(data => {
-      if (data?.success) setStats(data.data);
-    }).finally(() => setLoading(false));
+  const fetchStats = useCallback(() => {
+    setLoading(true);
+    setError(false);
+    fetchAPI("/admin/stats")
+      .then(data => {
+        if (data?.success) setStats(data.data);
+        else setError(true);
+      })
+      .catch(() => setError(true))
+      .finally(() => setLoading(false));
   }, []);
 
+  useEffect(() => { fetchStats(); }, [fetchStats]);
+
   if (loading) return <div className="text-gray-400 text-sm">Đang tải...</div>;
+
+  if (error) return (
+    <div className="flex flex-col items-center justify-center py-20 text-center">
+      <p className="text-gray-400 mb-3">Không tải được dữ liệu</p>
+      <button onClick={fetchStats}
+        className="text-sm px-4 py-2 rounded-lg border border-gray-200 dark:border-gray-700 font-medium hover:bg-gray-50 dark:hover:bg-gray-800">
+        Thử lại
+      </button>
+    </div>
+  );
 
   return (
     <div className="space-y-8">

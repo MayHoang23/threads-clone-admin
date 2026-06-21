@@ -12,16 +12,24 @@ export default function PostsPage() {
   const [search, setSearch] = useState("");
   const [hidden, setHidden] = useState("");
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
   const [toast, setToast] = useState("");
 
   const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(""), 3000); };
 
   const fetchPosts = useCallback(async () => {
     setLoading(true);
-    const qs = new URLSearchParams({ page, limit: 10, search, hidden }).toString();
-    const data = await fetchAPI(`/admin/posts?${qs}`);
-    if (data?.success) { setPosts(data.data.posts); setTotal(data.data.total); }
-    setLoading(false);
+    setError(false);
+    try {
+      const qs = new URLSearchParams({ page, limit: 10, search, hidden }).toString();
+      const data = await fetchAPI(`/admin/posts?${qs}`);
+      if (data?.success) { setPosts(data.data.posts); setTotal(data.data.total); }
+      else setError(true);
+    } catch (err) {
+      setError(true);
+    } finally {
+      setLoading(false);
+    }
   }, [page, search, hidden]);
 
   useEffect(() => { fetchPosts(); }, [fetchPosts]);
@@ -75,6 +83,14 @@ export default function PostsPage() {
           <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
             {loading ? (
               <tr><td colSpan={7} className="text-center py-8 text-gray-400">Đang tải...</td></tr>
+            ) : error ? (
+              <tr><td colSpan={7} className="text-center py-12">
+                <p className="text-gray-400 mb-3">Không tải được dữ liệu</p>
+                <button onClick={fetchPosts}
+                  className="text-sm px-4 py-2 rounded-lg border border-gray-200 dark:border-gray-700 font-medium hover:bg-gray-50 dark:hover:bg-gray-800">
+                  Thử lại
+                </button>
+              </td></tr>
             ) : posts.length === 0 ? (
               <tr><td colSpan={7} className="text-center py-8 text-gray-400">Không có dữ liệu</td></tr>
             ) : posts.map(post => (

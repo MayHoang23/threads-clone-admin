@@ -14,6 +14,7 @@ export default function HashtagsPage() {
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
   const [toast, setToast] = useState("");
   const [top, setTop] = useState([]);
 
@@ -21,15 +22,26 @@ export default function HashtagsPage() {
 
   const fetchHashtags = useCallback(async () => {
     setLoading(true);
-    const qs = new URLSearchParams({ page, limit: 20, search }).toString();
-    const data = await fetchAPI(`/admin/hashtags?${qs}`);
-    if (data?.success) { setHashtags(data.data.hashtags); setTotal(data.data.total); }
-    setLoading(false);
+    setError(false);
+    try {
+      const qs = new URLSearchParams({ page, limit: 20, search }).toString();
+      const data = await fetchAPI(`/admin/hashtags?${qs}`);
+      if (data?.success) { setHashtags(data.data.hashtags); setTotal(data.data.total); }
+      else setError(true);
+    } catch (err) {
+      setError(true);
+    } finally {
+      setLoading(false);
+    }
   }, [page, search]);
 
   const fetchTop = useCallback(async () => {
-    const data = await fetchAPI("/admin/hashtags/top");
-    if (data?.success) setTop(data.data);
+    try {
+      const data = await fetchAPI("/admin/hashtags/top");
+      if (data?.success) setTop(data.data);
+    } catch (err) {
+      // Lỗi ở khối "Top trending" không nên chặn cả trang — giữ danh sách rỗng
+    }
   }, []);
 
   useEffect(() => { fetchHashtags(); }, [fetchHashtags]);
@@ -95,6 +107,14 @@ export default function HashtagsPage() {
           <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
             {loading ? (
               <tr><td colSpan={4} className="text-center py-8 text-gray-400">Đang tải...</td></tr>
+            ) : error ? (
+              <tr><td colSpan={4} className="text-center py-12">
+                <p className="text-gray-400 mb-3">Không tải được dữ liệu</p>
+                <button onClick={fetchHashtags}
+                  className="text-sm px-4 py-2 rounded-lg border border-gray-200 dark:border-gray-700 font-medium hover:bg-gray-50 dark:hover:bg-gray-800">
+                  Thử lại
+                </button>
+              </td></tr>
             ) : hashtags.length === 0 ? (
               <tr><td colSpan={4} className="text-center py-8 text-gray-400">Không có dữ liệu</td></tr>
             ) : hashtags.map((h, i) => (

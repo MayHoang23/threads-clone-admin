@@ -16,6 +16,7 @@ export default function ReportsPage() {
   const [page, setPage] = useState(1);
   const [status, setStatus] = useState("");
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
   const [toast, setToast] = useState("");
   const [resolveModal, setResolveModal] = useState(null); // null hoặc report object
 
@@ -23,10 +24,17 @@ export default function ReportsPage() {
 
   const fetchReports = useCallback(async () => {
     setLoading(true);
-    const qs = new URLSearchParams({ page, limit: 10, status }).toString();
-    const data = await fetchAPI(`/admin/reports?${qs}`);
-    if (data?.success) { setReports(data.data.reports); setTotal(data.data.total); }
-    setLoading(false);
+    setError(false);
+    try {
+      const qs = new URLSearchParams({ page, limit: 10, status }).toString();
+      const data = await fetchAPI(`/admin/reports?${qs}`);
+      if (data?.success) { setReports(data.data.reports); setTotal(data.data.total); }
+      else setError(true);
+    } catch (err) {
+      setError(true);
+    } finally {
+      setLoading(false);
+    }
   }, [page, status]);
 
   useEffect(() => { fetchReports(); }, [fetchReports]);
@@ -74,6 +82,14 @@ export default function ReportsPage() {
           <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
             {loading ? (
               <tr><td colSpan={5} className="text-center py-8 text-gray-400">Đang tải...</td></tr>
+            ) : error ? (
+              <tr><td colSpan={5} className="text-center py-12">
+                <p className="text-gray-400 mb-3">Không tải được dữ liệu</p>
+                <button onClick={fetchReports}
+                  className="text-sm px-4 py-2 rounded-lg border border-gray-200 dark:border-gray-700 font-medium hover:bg-gray-50 dark:hover:bg-gray-800">
+                  Thử lại
+                </button>
+              </td></tr>
             ) : reports.length === 0 ? (
               <tr><td colSpan={5} className="text-center py-8 text-gray-400">Không có dữ liệu</td></tr>
             ) : reports.map(report => (
